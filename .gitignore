@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Production
+/build
+/dist
+
+# Environment. Secrets never enter the repository.
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Vercel
+.vercel
+
+# Image acquisition staging. This holds the raw search downloads including the
+# candidates that were REJECTED for not being Pexels-sourced. Only the curated,
+# credited files in /public/images/ are committed. See image-credits.md.
+/image-search/
+
+# Unpacked design source. theevent-v1.0.0.zip is the tracked source of truth and
+# is what INVENTORY.md cites, so the extracted copy is working material only and
+# is reproducible with `unzip theevent-v1.0.0.zip -d design-source`. The
+# extraction is not deleted, just not committed twice.
+/design-source/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+*~

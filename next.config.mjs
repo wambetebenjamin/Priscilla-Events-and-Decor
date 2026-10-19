@@ -1,6 +1,7 @@
 /**
  * Priscilla Events and Decor
- * Stack locked to the versions stated in the brief: Next.js 15.3.3, React 19.1.0, Node 24.3.0.
+ * Stack: Next.js 15.5.28 (patched), React 19.2.0, Node 24.x — see VERCEL_SPEC.md.
+ * Previous pin (15.3.3) was blocked by Vercel VULNERABLE_NEXTJS_VERSION (CVE-2025-66478).
  *
  * Notes on parity with the design source (TheEvent / BootstrapMade):
  * - The source ships no image optimisation pipeline and marks up photography with plain <img>

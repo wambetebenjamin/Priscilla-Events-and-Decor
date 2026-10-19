@@ -1,0 +1,123 @@
+VERCEL DEPLOYMENT REQUIREMENTS — paste into any AI website builder
+(Verified 2026-10-19 against vercel.com/docs + nextjs.org advisories)
+
+============================================================
+1. RUNTIME
+============================================================
+- package.json:  "engines": { "node": "24.x" }
+- .nvmrc:        exactly "24"   (major only, no patch)
+- Vercel Project Settings -> Node.js Version: 24.x
+- Local + CI: Node 24 (fnm/nvm use 24)
+- NEVER use Node 18 or 20. Node 20 is EOL 2026-04-30 and removed from Vercel new builds on 2026-10-01.
+- Node 26 is only in Vercel Sandboxes, not Builds/Functions. Do not target it.
+
+============================================================
+2. FRAMEWORK (this is what causes the deploy block)
+============================================================
+- Next.js: use the latest patched release on your line:
+    15.5.x  -> 15.5.28 or newer
+    16.x    -> 16.4.2 or newer
+    14.x    -> 14.2.35 or newer
+  NEVER emit next@15.3.3 or any 15.3.x below 15.3.8.
+- React + React DOM: 19.2.0 or newer (must be bumped together with Next).
+- TypeScript: 5.9.x. @types/node: 24.x. @types/react + @types/react-dom: 19.2.x.
+- Add these npm overrides, because Next still pins vulnerable transitive versions:
+    "overrides": {
+      "postcss": "8.5.31",
+      "sharp": "0.35.5",
+      "sprintf-js": "1.1.3"
+    }
+- Commit BOTH package.json AND package-lock.json (or pnpm-lock.yaml).
+  Never mix package managers. Never commit node_modules, .next, or .vercel/output.
+- Verify: npm audit --audit-level=moderate  ->  0 critical, 0 high.
+- NEVER set DANGEROUSLY_DEPLOY_VULNERABLE_CVE_2025_66478=1 to bypass the gate.
+
+============================================================
+3. BUILD SETTINGS (Vercel Dashboard)
+============================================================
+- Framework Preset: Next.js
+- Build Command:    next build        (npm run build must call next build)
+- Install Command:  npm ci            (Vercel auto-detects from package-lock.json)
+- Output Directory: leave empty      (.next is the default; do not set "out" unless a pure static export)
+- Root Directory:   ./               (or the app folder in a monorepo)
+- Node.js Version:  24.x
+
+============================================================
+4. next.config.mjs
+============================================================
+- reactStrictMode: true
+- poweredByHeader: false
+- images: { unoptimized: true } ONLY if every image has explicit width/height; otherwise omit.
+- allowedDevOrigins: ['*.e2b.app', '*.arena.ai', 'localhost', '127.0.0.1'] for preview sandboxes.
+- Keep eslint/type checking ON in production (do not set ignoreDuringBuilds/ignoreBuildErrors true).
+- Use next.config.mjs (ESM). Do not use .htaccess, nginx.conf, or _redirects anywhere.
+
+============================================================
+5. vercel.json (security layer, required)
+============================================================
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "headers": [
+    { "source": "/(.*)", "headers": [
+      { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com; frame-src https://www.google.com https://maps.google.com; connect-src 'self' https://www.google.com https://www.recaptcha.net; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests" },
+      { "key": "X-Content-Type-Options", "value": "nosniff" },
+      { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+      { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+      { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
+      { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
+    ]},
+    { "source": "/images/(.*)", "headers": [
+      { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+    ]},
+    { "source": "/api/(.*)", "headers": [
+      { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }
+    ]}
+  ]
+}
+
+============================================================
+6. ENVIRONMENT VARIABLES
+============================================================
+- Public: NEXT_PUBLIC_* (inlined at build time; changing one requires a redeploy).
+- Secrets: NO NEXT_PUBLIC_ prefix (SMTP, KV/Redis, WhatsApp, reCAPTCHA secret, Blob).
+- Commit only .env.example with empty values. Never commit .env / .env.local.
+- Set every variable in Vercel Dashboard for Production + Preview + Development.
+- Pull locally with: vercel env pull .env.local
+- Storage: use @upstash/redis (Vercel Marketplace), NOT deprecated @vercel/kv.
+
+============================================================
+7. API ROUTES / FUNCTIONS
+============================================================
+- export const runtime = "nodejs";  (Node.js is the default; Edge is being deprecated)
+- export const maxDuration = 60;    on routes that call email/WhatsApp/Redis
+- Function bundle limit: 250 MB uncompressed. Keep sharp/Playwright/ffmpeg out of routes.
+- Always: no-store on /api/*, input validation, rate limiting, no secrets in client code.
+
+============================================================
+8. VERIFY BEFORE HANDING OVER (all four must pass)
+============================================================
+1) npm ci                    -> lockfile installs cleanly
+2) npm run typecheck         -> tsc --noEmit, 0 errors
+3) npm run build             -> Next.js builds, route table shows o / * / f, exit 0
+4) npm audit --audit-level=moderate -> 0 critical, 0 high
+
+============================================================
+9. FIRST DEPLOY AFTER A VERSION BUMP
+============================================================
+- Vercel prints "Build cache cleared after a dependency security block"
+  once. This is expected. It self-heals on the next deploy.
+- If the deploy is still rejected: Dashboard -> Deployments -> ...
+  -> Redeploy -> UNTICK "Use existing Build Cache" -> Deploy.
+- Expected error if you skipped step 2:
+  errorCode: VULNERABLE_NEXTJS_VERSION
+  "Vulnerable version of Next.js detected, please update immediately."
+  Fix = bump Next.js, regenerate the lockfile, redeploy. No other workaround.
+
+============================================================
+10. HARD LIMITS TO DESIGN AROUND
+============================================================
+- Build time: 45 min. Build cache: 1.5 GB (Standard) — keep public assets out of it.
+- Static uploads: 100 MB Hobby / 1 GB Pro; 15,000 source files max via CLI.
+- Functions: 250 MB uncompressed, 300 s max on Hobby, 800 s on Pro.
+- Prefer Vercel Blob / external CDN for video and large photo sets.

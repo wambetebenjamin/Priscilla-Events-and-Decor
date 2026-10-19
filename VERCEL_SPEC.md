@@ -328,7 +328,7 @@ git push → Vercel Git integration → Install (npm ci) → Build (next build)
 - **Production deploys:** only from the configured Production Branch (`main`). Use protected previews on Pro/Enterprise where available.
 - **Preview deploys:** every PR/push to non-prod branches. Isolated env vars (Preview env).
 - **Deploy Hooks:** `?buildCache=false` to skip cache for webhook-triggered builds.
-- **Skipping:** `vercel --prod --force` skips cache; `vercel deploy --with-cache` keeps it.
+- **Skipping:** `vercel deploy --force` bypasses the deployment cache; `VERCEL_FORCE_NO_BUILD_CACHE=1` skips the build cache for one deploy.
 
 ---
 
@@ -362,7 +362,7 @@ ENV
 - Set all vars in Vercel Dashboard for Production + Preview + Development
 
 SECURITY
-- You will be blocked if Next.js is < 15.3.8 / 15.4.10 / 15.5.9+ (depending on line). Always emit the latest patch.
+- You will be blocked if Next.js is unpatched. As of Oct 2026 the floors are 14.2.35 / 15.5.28 / 16.4.2 — always emit the latest patch and re-check npm.
 - Never set DANGEROUSLY_DEPLOY_VULNERABLE_CVE_2025_66478=1 to bypass the gate.
 - Add the postcss/sharp/sprintf-js overrides above; updating Next.js alone does NOT clear them.
 - No .htaccess, no _redirects, no output:"export" if you need API routes
@@ -426,6 +426,17 @@ Audit:     0 critical, 0 high, 4 moderate (sprintf-js chain, no upstream fix)
 Build:     41 static pages, ○ / ● / ƒ, exit 0
 ```
 
+## Appendix B — How to re-verify in 60 seconds
+
+```bash
+node --version          # 24.x on Vercel (24.11.0 at time of writing)
+npm view next version   # compare to package.json next
+npm audit               # 0 critical/high expected
+npm run build           # must list ○ / ● / ƒ routes, exit 0
+```
+
+If any command fails, do not push to `main` — Vercel will block.
+
 ## Appendix C — The exact `package.json` fields Vercel reads
 
 ```json
@@ -452,15 +463,3 @@ Build:     41 static pages, ○ / ● / ƒ, exit 0
 ```
 
 Plus `.nvmrc` containing exactly `24` (no patch) and `package-lock.json` committed alongside.
-
-## Appendix B — How to re-verify in 60 seconds
-
-```bash
-node --version          # should be 24.x on Vercel (24.11.0 today)
-npm view next version   # compare to package.json next
-npm audit               # 0 critical/high expected
-npm run build           # must list ○ / ● / ƒ routes, exit 0
-```
-
-If any command fails, do not push to `main` — Vercel will block.
-
